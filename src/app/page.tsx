@@ -69,11 +69,17 @@ export default function HomePage() {
 
       <main className="space-y-5 px-5">
         <section>
-          <div className="space-y-2">
-            {pets.map((pet) => (
-              <PetSummaryCard key={pet.id} pet={pet} />
-            ))}
-          </div>
+          {pets.length === 0 ? (
+            <div className="rounded-xl bg-surface-elevated px-4 py-4 text-sm text-teal-muted">
+              暂无宠物，请前往“我的”页面添加宠物档案。
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {pets.map((pet) => (
+                <PetSummaryCard key={pet.id} pet={pet} />
+              ))}
+            </div>
+          )}
         </section>
 
         <section>
@@ -124,6 +130,11 @@ export default function HomePage() {
                 );
               })}
 
+              {pets.length === 0 ? (
+                <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-teal-muted">
+                  暂无可展示宠物位置
+                </div>
+              ) : null}
               {/* 简洁浮层：在线设备数 */}
               <div className="absolute bottom-2 right-2 rounded-full bg-surface-elevated/90 px-3 py-1 text-[11px] font-semibold text-teal-muted shadow-sm backdrop-blur">
                 在线设备：{pets.filter((pet) => pet.online).length}

@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Cpu, HeartPulse, Megaphone, ShieldAlert } from "lucide-react";
 import {
-  countUnreadInbox,
-  INITIAL_INBOX_MESSAGES,
   type InboxCategory,
   type InboxMessage,
   type InboxPriority,
 } from "@/data/inbox-messages";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
-import { useNotificationInbox } from "@/state/notification-context";
+import { useAppStore, getUnreadNotifications } from "@/state/app-store";
 
 type TabKey = "all" | InboxCategory;
 
@@ -22,24 +21,15 @@ const CATEGORY_ICON: Record<InboxCategory, typeof ShieldAlert> = {
   service: Megaphone,
 };
 
-/** 严重程度：仅用底色 + 细边线 + 图标色，不用文字标签 */
 function cardTone(priority: InboxPriority) {
-  if (priority === "critical") {
-    return "border border-red-200/70 bg-red-50/50";
-  }
-  if (priority === "warning") {
-    return "border border-amber-200/70 bg-amber-50/40";
-  }
+  if (priority === "critical") return "border border-red-200/70 bg-red-50/50";
+  if (priority === "warning") return "border border-amber-200/70 bg-amber-50/40";
   return "border border-black/[0.04] bg-surface-elevated/90";
 }
 
 function iconTone(category: InboxCategory, priority: InboxPriority) {
-  if (priority === "critical") {
-    return "bg-red-100/90 text-red-600";
-  }
-  if (priority === "warning") {
-    return "bg-amber-100/80 text-amber-800";
-  }
+  if (priority === "critical") return "bg-red-100/90 text-red-600";
+  if (priority === "warning") return "bg-amber-100/80 text-amber-800";
   switch (category) {
     case "safety":
       return "bg-white/90 text-primary";
@@ -78,19 +68,14 @@ function MessageRow({
       onClick={() => {
         if (!item.read) onMarkRead(item.id);
       }}
-      className={`relative w-full rounded-2xl px-3.5 py-3 text-left shadow-[0_8px_24px_rgb(38_26_0/0.04)] transition active:scale-[0.99] ${cardTone(
-        item.priority,
-      )}`}
+      className={`relative w-full rounded-2xl px-3.5 py-3 text-left shadow-[0_8px_24px_rgb(38_26_0/0.04)] transition active:scale-[0.99] ${cardTone(item.priority)}`}
     >
       {unread ? (
         <span className="absolute right-3 top-3 h-1.5 w-1.5 rounded-full bg-secondary" aria-hidden />
       ) : null}
       <div className="flex gap-3 pr-2">
         <span
-          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconTone(
-            item.category,
-            item.priority,
-          )}`}
+          className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${iconTone(item.category, item.priority)}`}
         >
           <Icon className="h-4 w-4" strokeWidth={1.75} />
         </span>
@@ -107,29 +92,32 @@ function MessageRow({
   );
 }
 
-export default function MessagesPage() {
-  const { setUnreadTotal } = useNotificationInbox();
-  const [messages, setMessages] = useState<InboxMessage[]>(() => [...INITIAL_INBOX_MESSAGES]);
-  const [tab, setTab] = useState<TabKey>("all");
+function MessagesPageBody() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const requestedTab: TabKey =
+    tabParam === "safety" || tabParam === "health" || tabParam === "device" || tabParam === "service"
+      ? tabParam
+      : "all";
+
+  const notifications = useAppStore((s) => s.notifications);
+  const markNotificationRead = useAppStore((s) => s.markNotificationRead);
+  const [tab, setTab] = useState<TabKey>(requestedTab);
 
   useEffect(() => {
-    setUnreadTotal(countUnreadInbox(messages));
-  }, [messages, setUnreadTotal]);
+    setTab(requestedTab);
+  }, [requestedTab]);
 
   const filtered = useMemo(() => {
-    if (tab === "all") return messages;
-    return messages.filter((m) => m.category === tab);
-  }, [messages, tab]);
-
-  function markRead(id: string) {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, read: true } : m)));
-  }
+    if (tab === "all") return notifications;
+    return notifications.filter((m) => m.category === tab);
+  }, [notifications, tab]);
 
   const unreadInTab = filtered.filter((m) => !m.read).length;
 
   function unreadForTab(key: TabKey) {
-    if (key === "all") return messages.filter((m) => !m.read).length;
-    return messages.filter((m) => m.category === key && !m.read).length;
+    if (key === "all") return getUnreadNotifications(notifications);
+    return notifications.filter((m) => m.category === key && !m.read).length;
   }
 
   return (
@@ -147,9 +135,7 @@ export default function MessagesPage() {
                 type="button"
                 onClick={() => setTab(t.key)}
                 className={`relative shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
-                  active
-                    ? "bg-primary text-on-primary shadow-sm"
-                    : "bg-surface-muted/80 text-teal-muted"
+                  active ? "bg-primary text-on-primary shadow-sm" : "bg-surface-muted/80 text-teal-muted"
                 }`}
               >
                 {t.label}
@@ -173,15 +159,30 @@ export default function MessagesPage() {
           <p className="py-10 text-center text-sm text-teal-muted">该分类暂无消息</p>
         ) : (
           <>
-            {unreadInTab > 0 ? (
-              <p className="mb-2 text-[11px] text-teal-muted">本分类 {unreadInTab} 条未读</p>
-            ) : null}
+            {unreadInTab > 0 ? <p className="mb-2 text-[11px] text-teal-muted">本分类 {unreadInTab} 条未读</p> : null}
             {filtered.map((item) => (
-              <MessageRow key={item.id} item={item} onMarkRead={markRead} />
+              <MessageRow key={item.id} item={item} onMarkRead={markNotificationRead} />
             ))}
           </>
         )}
       </main>
     </MobileShell>
+  );
+}
+
+function MessagesPageFallback() {
+  return (
+    <MobileShell withBottomNav={false}>
+      <AppTopBar title="消息中心" showBack backHref="/profile" />
+      <main className="px-5 py-8 text-sm text-teal-muted">加载中…</main>
+    </MobileShell>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<MessagesPageFallback />}>
+      <MessagesPageBody />
+    </Suspense>
   );
 }

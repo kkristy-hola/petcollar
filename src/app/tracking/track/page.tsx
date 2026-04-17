@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   MapPin,
   Moon,
@@ -177,12 +178,12 @@ export default function TrackPage() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
+          <Link
+            href="/profile/messages?tab=safety"
             className="mt-4 inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-primary to-[#a07820] px-5 py-3.5 text-sm font-semibold text-on-primary shadow-sm"
           >
             查看告警记录
-          </button>
+          </Link>
         </SoftCard>
       </main>
     </MobileShell>

@@ -1,4 +1,8 @@
+"use client";
+
+import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useState } from "react";
 import {
   MapPin,
   Radio,
@@ -7,6 +11,7 @@ import {
   Megaphone,
   Users,
   Phone,
+  Delete,
 } from "lucide-react";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
@@ -16,12 +21,49 @@ import { SoftCard } from "@/components/ui/SoftCard";
 import { mockFindPet, mockPet } from "@/data/mock";
 
 export default function FindPetPage() {
+  const [dialOpen, setDialOpen] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [callStatus, setCallStatus] = useState<"idle" | "dialing" | "inCall" | "ended">("idle");
+  const dialKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
+
+  function appendDialKey(key: string) {
+    setPhoneNumber((prev) => (prev.length >= 20 ? prev : prev + key));
+  }
+
+  function removeLastDigit() {
+    setPhoneNumber((prev) => prev.slice(0, -1));
+  }
+
+  function openDialer() {
+    setCallStatus("dialing");
+    setDialOpen(true);
+    setPhoneNumber("");
+  }
+
+  function hangUpCall() {
+    setCallStatus("ended");
+    setDialOpen(false);
+  }
+
+  useEffect(() => {
+    if (callStatus !== "ended") return;
+    const timer = window.setTimeout(() => setCallStatus("idle"), 1600);
+    return () => window.clearTimeout(timer);
+  }, [callStatus]);
+
   return (
     <MobileShell
       withBottomNav={false}
       overlay={
         <button
           type="button"
+          onClick={() => {
+            if (callStatus === "inCall") {
+              hangUpCall();
+              return;
+            }
+            openDialer();
+          }}
           className="pointer-events-auto absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom)+12px)] right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg"
           aria-label="一键呼叫"
         >
@@ -81,12 +123,12 @@ export default function FindPetPage() {
                 最后更新于 {mockFindPet.lastUpdate}
               </p>
             </div>
-            <button
-              type="button"
+            <Link
+              href="/tracking/trajectory"
               className="shrink-0 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-on-primary"
             >
               路线追踪
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -176,6 +218,82 @@ export default function FindPetPage() {
           <span className="text-stone-400">›</span>
         </SoftCard>
       </main>
+
+      {dialOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDialOpen(false)}
+        >
+          <div
+            className="w-full max-w-[390px] rounded-t-[2rem] bg-surface-elevated px-5 pb-[env(safe-area-inset-bottom)] pt-5 shadow-[var(--shadow-soft)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-primary-deep">一键呼叫</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setDialOpen(false);
+                  if (callStatus === "dialing") setCallStatus("idle");
+                }}
+                className="text-sm font-semibold text-teal-muted"
+              >
+                取消
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-surface-muted px-4 py-3 text-center">
+              <p className="text-[11px] font-semibold text-secondary">电话号码</p>
+              <p className="mt-1 min-h-7 text-2xl font-bold tracking-[0.08em] text-primary-deep">
+                {phoneNumber || "-"}
+              </p>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {dialKeys.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => appendDialKey(key)}
+                  className="rounded-2xl bg-surface-muted px-3 py-3.5 text-lg font-semibold text-primary-deep shadow-sm"
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={removeLastDigit}
+                className="flex items-center justify-center rounded-xl bg-surface-muted px-3 py-3 text-sm font-semibold text-secondary"
+                aria-label="删除一位"
+              >
+                <Delete className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDialOpen(false)}
+                className="rounded-xl bg-surface-muted px-3 py-3 text-sm font-semibold text-secondary"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (phoneNumber.trim()) setCallStatus("inCall");
+                  setDialOpen(false);
+                }}
+                className="rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-on-primary"
+              >
+                拨号
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
     </MobileShell>
   );

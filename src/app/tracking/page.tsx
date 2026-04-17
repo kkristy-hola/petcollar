@@ -46,11 +46,23 @@ export default function TrackingPage() {
   const zoomScale = 1 + (zoomLevel - 2) * 0.08;
 
   function handleLocatePet() {
+    if (!selectedPet) return;
     const target = markerData.find((item) => item.pet.id === selectedPet.id) ?? markerData[0];
     if (!target) return;
     setCenterShift({ x: 50 - target.left, y: 50 - target.top });
     setFocusPulse(true);
     window.setTimeout(() => setFocusPulse(false), 800);
+  }
+
+  if (pets.length === 0 || !selectedPet) {
+    return (
+      <MobileShell>
+        <AppTopBar title="定位 · 实时地图" />
+        <main className="px-5 py-10 text-center text-sm text-teal-muted">
+          暂无宠物，请先在“我的”页面新增宠物档案。
+        </main>
+      </MobileShell>
+    );
   }
 
   return (
