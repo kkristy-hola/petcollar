@@ -14,7 +14,14 @@ import { useAppStore } from "@/state/app-store";
 function DeviceMain({ deviceId }: { deviceId: string }) {
   const { devices, setDeviceBoundPet, removeDevice } = useProfileDevices();
   const { pets } = usePets();
-  const device = devices.find((d) => d.id === deviceId)!;
+  const device = devices.find((d) => d.id === deviceId);
+  if (!device) {
+    return (
+      <main className="px-5 py-8">
+        <p className="text-sm text-teal-muted">该设备已被删除，页面已自动回退。</p>
+      </main>
+    );
+  }
   const petName = pets.find((p) => p.id === device.boundPetId)?.name;
 
   return (

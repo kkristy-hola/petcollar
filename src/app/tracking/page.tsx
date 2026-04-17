@@ -15,9 +15,11 @@ import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
 import { PetSwitch } from "@/components/pets/PetSwitch";
 import { usePets } from "@/state/pets-context";
+import { getEffectivePetDeviceStatus, useAppStore } from "@/state/app-store";
 
 export default function TrackingPage() {
   const { pets, selectedPetId } = usePets();
+  const devices = useAppStore((s) => s.devices);
   const selectedPet =
     selectedPetId === "all"
       ? pets[0]
@@ -34,13 +36,14 @@ export default function TrackingPage() {
   const markerData = useMemo(
     () =>
       visiblePets.map((pet, index) => {
+        const status = getEffectivePetDeviceStatus(pet, devices);
         let hash = index * 73;
         for (let i = 0; i < pet.id.length; i++) hash += pet.id.charCodeAt(i) * (i + 3);
         const left = 18 + (Math.abs(hash) % 64); // 18% ~ 82%
         const top = 20 + (Math.abs(hash * 9) % 58); // 20% ~ 78%
-        return { pet, left, top };
+        return { pet, left, top, status };
       }),
-    [visiblePets],
+    [devices, visiblePets],
   );
 
   const zoomScale = 1 + (zoomLevel - 2) * 0.08;
@@ -64,6 +67,7 @@ export default function TrackingPage() {
       </MobileShell>
     );
   }
+  const selectedStatus = getEffectivePetDeviceStatus(selectedPet, devices);
 
   return (
     <MobileShell>
@@ -87,14 +91,16 @@ export default function TrackingPage() {
                 实时状态
               </p>
               <p className="text-base font-bold text-primary-deep">
-                {pets.filter((pet) => pet.online).length}只在线
+                {markerData.filter((item) => item.status.online).length}只在线
               </p>
               <p className="mt-0.5 text-[11px] text-teal-muted">
                 平均电量{" "}
-                {Math.round(
-                  pets.reduce((sum, pet) => sum + pet.battery, 0) / Math.max(1, pets.length),
-                )}
-                % · 信号 {selectedPet.signal}
+                {(() => {
+                  const batteryList = devices.map((d) => d.batteryPct).filter((n) => typeof n === "number");
+                  if (batteryList.length === 0) return "—";
+                  return `${Math.round(batteryList.reduce((sum, n) => sum + n, 0) / batteryList.length)}%`;
+                })()}{" "}
+                · 信号 {selectedStatus.signalLabel}
               </p>
             </div>
           </div>
@@ -170,7 +176,7 @@ export default function TrackingPage() {
 
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative h-full w-full">
-              {markerData.map(({ pet, left, top }) => (
+              {markerData.map(({ pet, left, top, status }) => (
                 <div
                   key={pet.id}
                   className="absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
@@ -185,7 +191,9 @@ export default function TrackingPage() {
                       className={`h-4 w-4 rounded-full border-2 border-white shadow ${
                         pet.id === selectedPet.id && focusPulse
                           ? "bg-primary ring-4 ring-primary/25"
-                          : "bg-emerald-500"
+                          : status.online
+                            ? "bg-emerald-500"
+                            : "bg-stone-400"
                       }`}
                     />
                     <span className="mt-2 rounded-full bg-white/88 px-3 py-1 text-center text-xs font-semibold text-primary-deep shadow-sm backdrop-blur">

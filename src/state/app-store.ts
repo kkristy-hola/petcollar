@@ -385,3 +385,33 @@ export function getVisiblePets(pets: AppPet[], selectedPetId: string | null, pet
   const selected = pets.find((p) => p.id === selectedPetId);
   return selected ? [selected] : pets.length ? [pets[0]] : [];
 }
+
+export function getBoundDeviceForPet(pet: AppPet, devices: AppDevice[]): AppDevice | null {
+  if (!pet.boundDeviceId) return null;
+  return devices.find((d) => d.id === pet.boundDeviceId) ?? null;
+}
+
+export function getEffectivePetDeviceStatus(pet: AppPet, devices: AppDevice[]) {
+  const boundDevice = getBoundDeviceForPet(pet, devices);
+  if (!boundDevice) {
+    return {
+      online: false,
+      batteryPct: null as number | null,
+      signalLabel: "未绑定设备",
+      signalPct: 0,
+    };
+  }
+  const signalLabel = boundDevice.online
+    ? boundDevice.signalPct >= 80
+      ? "强"
+      : boundDevice.signalPct >= 45
+        ? "中"
+        : "弱"
+    : "无信号";
+  return {
+    online: boundDevice.online,
+    batteryPct: boundDevice.batteryPct,
+    signalLabel,
+    signalPct: boundDevice.signalPct,
+  };
+}

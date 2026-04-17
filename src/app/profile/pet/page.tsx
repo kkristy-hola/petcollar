@@ -38,7 +38,12 @@ function PetEditForm({ isNew, petKey }: { isNew: boolean; petKey: string }) {
   const addPet = useAppStore((s) => s.addPet);
   const updatePet = useAppStore((s) => s.updatePet);
   const removePet = useAppStore((s) => s.removePet);
+  const devices = useAppStore((s) => s.devices);
+  const bindPetDevice = useAppStore((s) => s.bindPetDevice);
   const targetPet = pets.find((p) => p.id === petKey);
+  const currentDevice = targetPet?.boundDeviceId
+    ? devices.find((d) => d.id === targetPet.boundDeviceId) ?? null
+    : null;
 
   const [form, setForm] = useState<PetForm>(() => {
     if (isNew || !targetPet) return emptyForm;
@@ -170,6 +175,27 @@ function PetEditForm({ isNew, petKey }: { isNew: boolean; petKey: string }) {
                 <span className="pointer-events-none absolute top-1/2 right-5 -translate-y-1/2 text-[14px] font-semibold text-[#5a6968]">公斤</span>
               </div>
             </div>
+
+            {!isNew && targetPet ? (
+              <div className="rounded-[1.25rem] bg-[#fdf2e0] p-3 ring-1 ring-black/[0.03]">
+                <p className="text-[11px] font-bold tracking-[0.12em] text-[#5a6968]">绑定设备</p>
+                <p className="mt-1 text-xs text-teal-muted">
+                  当前：{currentDevice ? `${currentDevice.modelName}（${currentDevice.id}）` : "未绑定设备"}
+                </p>
+                <select
+                  value={targetPet.boundDeviceId ?? ""}
+                  onChange={(e) => bindPetDevice(targetPet.id, e.target.value || null)}
+                  className="mt-2 w-full rounded-xl border border-black/[0.08] bg-white/95 py-2.5 px-3 text-sm font-semibold text-primary-deep outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">未绑定</option>
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.modelName} · {d.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
 
           {!isNew ? (

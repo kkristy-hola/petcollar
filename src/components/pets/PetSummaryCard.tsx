@@ -1,8 +1,10 @@
 import Image from "next/image";
 import { MapPin } from "lucide-react";
+import { getEffectivePetDeviceStatus, type AppDevice } from "@/state/app-store";
 import type { PetProfile } from "@/state/pets-context";
 
-export function PetSummaryCard({ pet }: { pet: PetProfile }) {
+export function PetSummaryCard({ pet, devices = [] }: { pet: PetProfile; devices?: AppDevice[] }) {
+  const status = getEffectivePetDeviceStatus(pet, devices);
   return (
     <article className="rounded-xl bg-surface-elevated px-3 py-2.5 shadow-[var(--shadow-soft)]">
       <div className="flex items-start justify-between gap-3">
@@ -28,15 +30,17 @@ export function PetSummaryCard({ pet }: { pet: PetProfile }) {
         <div className="flex flex-col items-end gap-2 shrink-0">
           <span
             className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-              pet.online ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-600"
+              status.online ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-600"
             }`}
           >
-            {pet.online ? "在线" : "离线"}
+            {status.online ? "在线" : "离线"}
           </span>
 
           <div className="flex items-center gap-2 rounded-lg bg-surface-muted px-2 py-1">
             <span className="text-[11px] font-semibold text-primary-deep">电量</span>
-            <span className="text-[12px] font-bold text-primary-deep">{pet.battery}%</span>
+            <span className="text-[12px] font-bold text-primary-deep">
+              {status.batteryPct == null ? "—" : `${status.batteryPct}%`}
+            </span>
           </div>
         </div>
       </div>
