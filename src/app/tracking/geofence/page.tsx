@@ -1,401 +1,304 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
 import Image from "next/image";
-import { Crosshair, Home, GraduationCap, TreeDeciduous, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  Check,
+  Circle,
+  Crosshair,
+  GraduationCap,
+  Home,
+  Plus,
+  RectangleHorizontal,
+  ShieldCheck,
+  Trash2,
+  TreeDeciduous,
+  X,
+} from "lucide-react";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
 import { SoftCard } from "@/components/ui/SoftCard";
-import { mockFence } from "@/data/mock";
 
-const iconMap = {
-  home: Home,
-  tree: TreeDeciduous,
-  school: GraduationCap,
-} as const;
-
-const toneMap = {
-  yellow: "bg-amber-100 text-primary",
-  blue: "bg-sky-100 text-sky-800",
-  sage: "bg-emerald-100 text-emerald-800",
-} as const;
-
-type FenceMode = "circle" | "rect";
-type FenceTone = "yellow" | "blue" | "sage";
-type FenceIcon = "home" | "tree" | "school";
+type FenceShape = "circle" | "rectangle";
+type FenceIcon = "home" | "park" | "school";
 
 type FenceItem = {
   id: string;
-  title: string;
-  subtitle: string;
-  tone: FenceTone;
-  icon: FenceIcon;
-  shape: FenceMode;
+  name: string;
+  center: string;
+  shape: FenceShape;
   radiusM?: number;
   lengthM?: number;
   widthM?: number;
+  icon: FenceIcon;
 };
 
+const iconMap = {
+  home: Home,
+  park: TreeDeciduous,
+  school: GraduationCap,
+} as const;
+
+const initialFences: FenceItem[] = [
+  {
+    id: "home",
+    name: "温馨之家",
+    center: "阳光社区 8 栋",
+    shape: "circle",
+    radiusM: 200,
+    icon: "home",
+  },
+  {
+    id: "park",
+    name: "中央公园",
+    center: "中央公园北门",
+    shape: "circle",
+    radiusM: 800,
+    icon: "park",
+  },
+  {
+    id: "school",
+    name: "宠物学校",
+    center: "宠物学校训练场",
+    shape: "rectangle",
+    lengthM: 400,
+    widthM: 250,
+    icon: "school",
+  },
+];
+
+function fenceSize(fence: FenceItem) {
+  return fence.shape === "circle"
+    ? `圆形 · 半径 ${fence.radiusM}m`
+    : `方形 · ${fence.lengthM}m × ${fence.widthM}m`;
+}
+
 export default function GeofencePage() {
-  const [mode, setMode] = useState<FenceMode>("circle");
-  const [radius, setRadius] = useState(mockFence.radiusM);
+  const [fences, setFences] = useState<FenceItem[]>(initialFences);
+  const [activeFenceId, setActiveFenceId] = useState(initialFences[0].id);
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [shape, setShape] = useState<FenceShape>("circle");
+  const [radius, setRadius] = useState(300);
   const [rectLength, setRectLength] = useState(400);
   const [rectWidth, setRectWidth] = useState(250);
-  const [on, setOn] = useState(mockFence.enabled);
-  const [isPickingCenter, setIsPickingCenter] = useState(false);
-  const [centerOffset, setCenterOffset] = useState({ x: 0, y: 0 });
-  const petCurrentLocation = mockFence.centerLabel;
-  const centerLabel =
-    centerOffset.x === 0 && centerOffset.y === 0
-      ? mockFence.centerLabel
-      : `中心偏移 东${centerOffset.x}m · 北${centerOffset.y}m`;
-  const [fences, setFences] = useState<FenceItem[]>(
-    () =>
-      mockFence.fences.map((f) => ({
-        id: f.id,
-        title: f.title,
-        subtitle: f.subtitle,
-        tone: f.tone,
-        icon: f.icon,
-        shape: "circle",
-        radiusM: mockFence.radiusM,
-      })),
+
+  const activeFence = useMemo(
+    () => fences.find((fence) => fence.id === activeFenceId) ?? fences[0],
+    [activeFenceId, fences],
   );
-  const [selectedFenceId, setSelectedFenceId] = useState<string | null>(null);
 
-  function handleAddFence() {
-    const nextId = String(Date.now());
-    const isCircle = mode === "circle";
-    const subtitle = isCircle
-      ? `半径 ${radius}m · 手动添加`
-      : `${rectLength}m × ${rectWidth}m · 手动添加`;
-    setFences((prev) => [
-      {
-        id: nextId,
-        title: isCircle ? "自定义圆形围栏" : "自定义方形围栏",
-        subtitle,
-        tone: isCircle ? "yellow" : "blue",
-        icon: isCircle ? "home" : "tree",
-        shape: mode,
-        radiusM: isCircle ? radius : undefined,
-        lengthM: isCircle ? undefined : rectLength,
-        widthM: isCircle ? undefined : rectWidth,
-      },
-      ...prev,
-    ]);
+  function saveFence() {
+    const next: FenceItem = {
+      id: `fence-${Date.now()}`,
+      name: name.trim() || "新围栏",
+      center: "宠物当前位置",
+      shape,
+      radiusM: shape === "circle" ? radius : undefined,
+      lengthM: shape === "rectangle" ? rectLength : undefined,
+      widthM: shape === "rectangle" ? rectWidth : undefined,
+      icon: "home",
+    };
+    setFences((items) => [...items, next]);
+    setName("");
+    setShape("circle");
+    setCreating(false);
   }
 
-  function handleRemoveFence(id: string) {
-    setFences((prev) => prev.filter((f) => f.id !== id));
-  }
-
-  function handleCenterPickStart() {
-    setIsPickingCenter(true);
-  }
-
-  function handleFenceEdit(fence: FenceItem) {
-    setSelectedFenceId(fence.id);
-    if (fence.shape === "circle") {
-      setMode("circle");
-      if (typeof fence.radiusM === "number") setRadius(fence.radiusM);
-      return;
-    }
-    setMode("rect");
-    if (typeof fence.lengthM === "number") setRectLength(fence.lengthM);
-    if (typeof fence.widthM === "number") setRectWidth(fence.widthM);
-  }
-
-  function handleCenterPickByDrag(dx: number, dy: number) {
-    const nextX = Math.max(-300, Math.min(300, centerOffset.x + Math.round(dx)));
-    const nextY = Math.max(-300, Math.min(300, centerOffset.y + Math.round(dy)));
-    setCenterOffset({ x: nextX, y: nextY });
-    setIsPickingCenter(false);
-  }
-
-  function usePetLocationAsCenter() {
-    setCenterOffset({ x: 0, y: 0 });
-    setIsPickingCenter(false);
+  function removeFence(id: string) {
+    setFences((items) => {
+      const next = items.filter((item) => item.id !== id);
+      if (id === activeFenceId) setActiveFenceId(next[0]?.id ?? "");
+      return next;
+    });
   }
 
   return (
     <MobileShell withBottomNav={false}>
       <AppTopBar title="定位 · 电子围栏" showBack backHref="/tracking" />
-      <main className="space-y-5 px-5">
-        <div className="rounded-2xl bg-surface-blue/70 p-1">
-          <div className="grid grid-cols-2 gap-1">
-            <button
-              type="button"
-              onClick={() => setMode("circle")}
-              className={`rounded-xl py-2.5 text-sm font-semibold transition ${
-                mode === "circle"
-                  ? "bg-white text-primary-deep shadow-sm"
-                  : "text-secondary/90"
-              }`}
-            >
-              圆形电子围栏
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("rect")}
-              className={`rounded-xl py-2.5 text-sm font-semibold transition ${
-                mode === "rect"
-                  ? "bg-white text-primary-deep shadow-sm"
-                  : "text-secondary/90"
-              }`}
-            >
-              方形电子围栏
-            </button>
-          </div>
-        </div>
-
-        <div
-          className="relative h-52 overflow-hidden rounded-[1.75rem] shadow-[var(--shadow-soft)]"
-          onMouseDown={(e) => {
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const onUp = (evt: MouseEvent) => {
-              handleCenterPickByDrag((evt.clientX - startX) / 6, (startY - evt.clientY) / 6);
-              window.removeEventListener("mouseup", onUp);
-            };
-            window.addEventListener("mouseup", onUp);
-          }}
-        >
-          <Image
-            src="/placeholders/geofence-map.svg"
-            alt=""
-            fill
-            className="object-cover"
-            sizes="390px"
-            priority
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            {mode === "circle" ? (
-              <div className="h-40 w-40 rounded-full border-[3px] border-amber-300/90 bg-amber-200/20 shadow-[0_0_40px_rgba(251,191,36,0.45)]" />
-            ) : (
-              <div className="h-32 w-44 rounded-2xl border-[3px] border-sky-300/90 bg-sky-200/20 shadow-[0_0_40px_rgba(56,189,248,0.35)]" />
-            )}
-          </div>
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-primary bg-white/85 shadow-md">
-              <span className="absolute h-[1px] w-7 bg-primary/80" />
-              <span className="absolute h-7 w-[1px] bg-primary/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-primary shadow-[0_0_0_3px_rgba(127,87,0,0.18)]" />
-            </div>
-          </div>
-          <p className="absolute left-1/2 top-2.5 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-semibold text-white/95 backdrop-blur">
-            拖动地图设置围栏中心点
-          </p>
-          <div className="absolute bottom-3 left-3 right-3 flex items-center gap-3 rounded-2xl bg-surface-warm/90 px-3 py-2.5 backdrop-blur-md">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] text-teal-muted">围栏中心点</p>
-              <p className="truncate text-sm font-bold text-primary-deep">{centerLabel}</p>
-            </div>
-            <button
-              type="button"
-              onClick={usePetLocationAsCenter}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary"
-              aria-label="使用宠物当前位置"
-            >
-              <Crosshair className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        <SoftCard className="space-y-2 bg-surface-muted/75 p-3.5">
-          <p className="text-xs text-teal-muted">
-            当前地图中心即围栏中心点，先选中心点，再设置围栏尺寸。
-          </p>
-          <p className="text-sm font-semibold text-primary-deep">围栏中心点：{centerLabel}</p>
-          {mode === "circle" ? (
-            <p className="text-xs text-teal-muted">半径：{radius}m</p>
-          ) : (
-            <>
-              <p className="text-xs text-teal-muted">长度：{rectLength}m</p>
-              <p className="text-xs text-teal-muted">宽度：{rectWidth}m</p>
-            </>
-          )}
-          <p className="text-xs text-teal-muted">宠物当前位置：{petCurrentLocation}</p>
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleCenterPickStart}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                isPickingCenter
-                  ? "bg-primary text-on-primary"
-                  : "bg-surface-blue text-secondary"
-              }`}
-            >
-              重新选点
-            </button>
-            <button
-              type="button"
-              onClick={usePetLocationAsCenter}
-              className="rounded-full bg-surface-blue px-3 py-1.5 text-xs font-semibold text-secondary"
-            >
-              使用宠物当前位置
-            </button>
-          </div>
-        </SoftCard>
-
-        <SoftCard className="space-y-5 bg-surface-warm p-5">
-          <div className="flex gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-bold text-primary-deep">围栏开关</p>
-              <p className="mt-1 text-xs leading-relaxed text-teal-muted">
-                开启后，宠物离开指定区域将收到通知
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={on}
-              onClick={() => setOn(!on)}
-              className={`relative h-9 w-16 shrink-0 rounded-full transition-colors ${on ? "bg-primary" : "bg-stone-300"}`}
-            >
-              <span
-                className={`absolute top-1 h-7 w-7 rounded-full bg-white shadow transition-transform ${on ? "left-8" : "left-1"}`}
+      <main className="space-y-4 px-5 pb-8">
+        {activeFence ? (
+          <SoftCard className="overflow-hidden bg-surface-elevated p-0">
+            <div className="relative h-48 overflow-hidden">
+              <Image
+                src="/placeholders/geofence-map.svg"
+                alt="当前围栏地图"
+                fill
+                className="object-cover"
+                sizes="390px"
+                priority
               />
-            </button>
-          </div>
-
-          {mode === "circle" ? (
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-semibold text-primary-deep">
-                  围栏半径
+              <div className="absolute inset-0 flex items-center justify-center">
+                {activeFence.shape === "circle" ? (
+                  <div className="h-32 w-32 rounded-full border-[3px] border-amber-400 bg-amber-200/25 shadow-[0_0_36px_rgba(251,191,36,0.38)]" />
+                ) : (
+                  <div className="h-24 w-40 rounded-2xl border-[3px] border-sky-400 bg-sky-200/25 shadow-[0_0_36px_rgba(56,189,248,0.3)]" />
+                )}
+              </div>
+              <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                当前生效
+              </span>
+              <span className="absolute bottom-3 left-3 right-3 rounded-2xl bg-white/88 px-3 py-2.5 shadow-sm backdrop-blur">
+                <span className="block text-sm font-bold text-primary-deep">{activeFence.name}</span>
+                <span className="mt-0.5 block text-[11px] text-teal-muted">
+                  {activeFence.center} · {fenceSize(activeFence)}
                 </span>
-                <span className="text-xl font-bold text-primary">{radius} m</span>
-              </div>
-              <input
-                type="range"
-                min={100}
-                max={1000}
-                step={50}
-                value={radius}
-                onChange={(e) => setRadius(Number(e.target.value))}
-                className="h-2 w-full cursor-pointer accent-primary"
-              />
-              <div className="mt-1 flex justify-between text-[11px] text-teal-muted">
-                <span>100m</span>
-                <span>1000m</span>
-              </div>
-              <p className="mt-2 text-[11px] text-teal-muted">
-                半径从围栏中心点向外扩展。
-              </p>
+              </span>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-sm font-semibold text-primary-deep">
-                方形范围设置
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="rounded-xl bg-white/80 p-2.5 ring-1 ring-black/[0.05]">
-                  <span className="text-[11px] font-medium text-teal-muted">长度 (m)</span>
-                  <input
-                    type="number"
-                    min={100}
-                    max={2000}
-                    step={50}
-                    value={rectLength}
-                    onChange={(e) => setRectLength(Number(e.target.value))}
-                    className="mt-1 w-full rounded-lg border border-black/[0.08] px-2 py-1.5 text-sm font-semibold text-primary-deep outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-                <label className="rounded-xl bg-white/80 p-2.5 ring-1 ring-black/[0.05]">
-                  <span className="text-[11px] font-medium text-teal-muted">宽度 (m)</span>
-                  <input
-                    type="number"
-                    min={100}
-                    max={2000}
-                    step={50}
-                    value={rectWidth}
-                    onChange={(e) => setRectWidth(Number(e.target.value))}
-                    className="mt-1 w-full rounded-lg border border-black/[0.08] px-2 py-1.5 text-sm font-semibold text-primary-deep outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-              </div>
-              <p className="text-[11px] text-teal-muted">
-                当前方形围栏：{rectLength}m × {rectWidth}m
-              </p>
-              <p className="text-[11px] text-teal-muted">
-                方形围栏以当前中心点向四周展开。
-              </p>
-            </div>
-          )}
-        </SoftCard>
+          </SoftCard>
+        ) : (
+          <SoftCard className="bg-surface-muted/80 p-5 text-center">
+            <p className="text-sm font-bold text-primary-deep">还没有围栏</p>
+            <p className="mt-1 text-xs text-teal-muted">新增后可手动设为当前使用</p>
+          </SoftCard>
+        )}
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold text-primary-deep">活跃围栏列表</h2>
-          <button
-            type="button"
-            onClick={handleAddFence}
-            className="rounded-full bg-surface-blue px-3 py-1.5 text-xs font-semibold text-secondary"
-          >
-            + 添加新区域
-          </button>
+        <div className="rounded-2xl bg-surface-blue/70 px-4 py-3 text-xs leading-relaxed text-secondary">
+          同一时间只会有一个围栏生效。切换时，原围栏会自动停用。
         </div>
 
-        <ul className="space-y-3">
-          {fences.map((f) => {
-            const Icon = iconMap[f.icon];
-            return (
-              <li key={f.id}>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleFenceEdit(f)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleFenceEdit(f);
-                    }
-                  }}
-                  className={`rounded-[1.75rem] transition active:scale-[0.99] ${
-                    selectedFenceId === f.id
-                      ? "ring-2 ring-primary/35"
-                      : "ring-1 ring-black/[0.03]"
+        <section>
+          <div className="mb-2 flex items-center justify-between px-0.5">
+            <div>
+              <h2 className="text-lg font-bold text-primary-deep">已保存围栏</h2>
+              <p className="mt-0.5 text-xs text-teal-muted">点击“设为当前”手动切换</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-1 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-white"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              新增
+            </button>
+          </div>
+
+          <ul className="space-y-2.5">
+            {fences.map((fence) => {
+              const Icon = iconMap[fence.icon];
+              const active = fence.id === activeFenceId;
+              return (
+                <li
+                  key={fence.id}
+                  className={`rounded-2xl p-3.5 shadow-sm ring-1 ${
+                    active ? "bg-[#fff5dc] ring-primary/25" : "bg-surface-elevated ring-black/[0.04]"
                   }`}
                 >
-                  <SoftCard className="flex items-center gap-3 bg-surface-muted/80 p-3.5">
-                  <span
-                    className={`flex h-11 w-11 items-center justify-center rounded-full ${toneMap[f.tone]}`}
-                  >
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-primary-deep">
-                      {f.title}
-                      <span className="ml-2 text-[10px] font-medium text-teal-muted">
-                        {f.shape === "circle" ? "圆形" : "方形"}
-                      </span>
-                    </p>
-                    <p className="text-xs text-teal-muted">{f.subtitle}</p>
+                  <div className="flex items-center gap-3">
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${active ? "bg-primary text-white" : "bg-surface-blue text-secondary"}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-bold text-primary-deep">{fence.name}</p>
+                        {active ? <span className="shrink-0 text-[10px] font-bold text-primary">当前使用</span> : null}
+                      </div>
+                      <p className="mt-0.5 truncate text-[11px] text-teal-muted">{fenceSize(fence)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFence(fence.id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-stone-400"
+                      aria-label={`删除${fence.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveFence(f.id);
-                    }}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-stone-400"
-                    aria-label="删除"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  </SoftCard>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  {!active ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveFenceId(fence.id)}
+                      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-surface-blue py-2.5 text-xs font-bold text-secondary transition active:scale-[0.99]"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      设为当前围栏
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
         <Link
           href="/profile/messages?tab=safety"
           className="inline-flex w-full items-center justify-center rounded-full bg-surface-blue px-5 py-3 text-sm font-semibold text-secondary"
         >
-          查看告警记录
+          查看越界告警记录
         </Link>
       </main>
+
+      {creating ? (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35" role="dialog" aria-modal="true">
+          <div className="max-h-[88vh] w-full max-w-[390px] overflow-y-auto rounded-t-[2rem] bg-surface-elevated px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-primary-deep">新增围栏</h2>
+                <p className="mt-0.5 text-xs text-teal-muted">形状在这里选择，保存后不会自动替换当前围栏</p>
+              </div>
+              <button type="button" onClick={() => setCreating(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-muted text-teal-muted" aria-label="关闭">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <label className="mt-5 block">
+              <span className="text-xs font-semibold text-secondary">围栏名称</span>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="例如：温馨之家"
+                className="mt-1.5 w-full rounded-xl border border-black/[0.08] bg-surface-muted px-3 py-3 text-sm font-semibold text-primary-deep outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-secondary">选择围栏形状</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => setShape("circle")} className={`rounded-2xl p-3 text-left ring-1 ${shape === "circle" ? "bg-[#fff0d2] text-primary-deep ring-primary/30" : "bg-surface-muted text-teal-muted ring-black/[0.04]"}`}>
+                  <Circle className="h-5 w-5" />
+                  <p className="mt-2 text-sm font-bold">圆形</p>
+                </button>
+                <button type="button" onClick={() => setShape("rectangle")} className={`rounded-2xl p-3 text-left ring-1 ${shape === "rectangle" ? "bg-surface-blue text-primary-deep ring-secondary/30" : "bg-surface-muted text-teal-muted ring-black/[0.04]"}`}>
+                  <RectangleHorizontal className="h-5 w-5" />
+                  <p className="mt-2 text-sm font-bold">方形</p>
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-surface-muted p-3.5">
+              <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-secondary">
+                <Crosshair className="h-4 w-4" />
+                中心点：宠物当前位置
+              </div>
+              {shape === "circle" ? (
+                <label className="block">
+                  <span className="flex items-center justify-between text-xs text-teal-muted">
+                    <span>围栏半径</span><strong className="text-primary-deep">{radius}m</strong>
+                  </span>
+                  <input type="range" min={100} max={1000} step={50} value={radius} onChange={(event) => setRadius(Number(event.target.value))} className="mt-2 w-full accent-primary" />
+                </label>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-teal-muted">
+                    长度（m）
+                    <input type="number" min={100} value={rectLength} onChange={(event) => setRectLength(Number(event.target.value))} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-primary-deep outline-none" />
+                  </label>
+                  <label className="text-xs text-teal-muted">
+                    宽度（m）
+                    <input type="number" min={100} value={rectWidth} onChange={(event) => setRectWidth(Number(event.target.value))} className="mt-1 w-full rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-primary-deep outline-none" />
+                  </label>
+                </div>
+              )}
+            </div>
+
+            <button type="button" onClick={saveFence} className="mt-5 w-full rounded-full bg-primary py-3.5 text-sm font-bold text-white shadow-sm">
+              保存围栏
+            </button>
+          </div>
+        </div>
+      ) : null}
     </MobileShell>
   );
 }

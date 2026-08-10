@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { Camera, Lightbulb, Phone, Volume2, Delete, Play, Square } from "lucide-react";
+import { Phone, PhoneCall, PhoneOff, ShieldCheck } from "lucide-react";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
 import { SoftCard } from "@/components/ui/SoftCard";
@@ -13,15 +13,7 @@ import { getEffectivePetDeviceStatus, useAppStore } from "@/state/app-store";
 export default function HomePage() {
   const { pets, selectedPetId, setSelectedPetId, setPetViewMode } = usePets();
   const devices = useAppStore((s) => s.devices);
-  const [isMonitoringOn, setIsMonitoringOn] = useState(false);
-  const [showStopOverlay, setShowStopOverlay] = useState(false);
-  const [isStopOverlayFading, setIsStopOverlayFading] = useState(false);
-  const [isLightOn, setIsLightOn] = useState(false);
-  const [isSoundOn, setIsSoundOn] = useState(false);
-  const [dialOpen, setDialOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
   const [callStatus, setCallStatus] = useState<"idle" | "dialing" | "inCall" | "ended">("idle");
-  const dialKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
 
   function getMarkerPositionPercent(petId: string, index: number) {
     let hash = index * 101;
@@ -31,23 +23,8 @@ export default function HomePage() {
     return { left, top };
   }
 
-  function appendDialKey(key: string) {
-    setPhoneNumber((prev) => (prev.length >= 20 ? prev : prev + key));
-  }
-
-  function removeLastDigit() {
-    setPhoneNumber((prev) => prev.slice(0, -1));
-  }
-
-  function openDialer() {
-    setCallStatus("dialing");
-    setDialOpen(true);
-    setPhoneNumber("");
-  }
-
   function hangUpCall() {
     setCallStatus("ended");
-    setDialOpen(false);
   }
 
   const callLabelMap: Record<"idle" | "dialing" | "inCall" | "ended", string> = {
@@ -56,6 +33,12 @@ export default function HomePage() {
     inCall: "正在通话",
     ended: "已结束",
   };
+
+  useEffect(() => {
+    if (callStatus !== "dialing") return;
+    const timer = window.setTimeout(() => setCallStatus("inCall"), 900);
+    return () => window.clearTimeout(timer);
+  }, [callStatus]);
 
   useEffect(() => {
     if (callStatus !== "ended") return;
@@ -128,203 +111,75 @@ export default function HomePage() {
         </section>
 
         <section>
-          <SoftCard className="bg-surface-elevated p-5 shadow-[0_20px_40px_rgb(38_26_0/0.08)]">
-            <div className="mb-3 flex items-center gap-2">
-              <Camera className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-bold text-primary-deep">
-                {currentPet ? `${currentPet.name} · 摄像头监控` : "摄像头监控"}
-              </h3>
-            </div>
-
-            <div
-              className="relative rounded-2xl bg-gradient-to-br from-stone-800 to-stone-600 p-4 text-white"
-              onClick={() => {
-                if (!isMonitoringOn) return;
-                setShowStopOverlay(true);
-                setIsStopOverlayFading(false);
-                window.setTimeout(() => setIsStopOverlayFading(true), 1200);
-                window.setTimeout(() => setShowStopOverlay(false), 1600);
-              }}
-            >
-              <div
-                className="absolute inset-0 opacity-25"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(90deg,rgba(255,255,255,0.18) 1px,transparent 1px),linear-gradient(rgba(255,255,255,0.12) 1px,transparent 1px)",
-                  backgroundSize: "18px 18px",
-                }}
-              />
-
-              <div className="relative flex h-44 items-center justify-center">
-                {!isMonitoringOn ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsMonitoringOn(true);
-                      setShowStopOverlay(false);
-                    }}
-                    className="flex h-16 w-16 items-center justify-center rounded-full bg-white/92 text-primary shadow-lg"
-                    aria-label="开启监控"
-                  >
-                    <Play className="ml-1 h-8 w-8 fill-current" />
-                  </button>
-                ) : (
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 h-2 w-2 rounded-full bg-emerald-400" />
-                    <p className="text-sm font-semibold text-white/90">监控中</p>
-                    <p className="mt-1 text-xs text-white/70">点击画面可呼出停止按钮</p>
-                  </div>
-                )}
-
-                {isMonitoringOn && showStopOverlay ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsMonitoringOn(false);
-                      setShowStopOverlay(false);
-                      setIsStopOverlayFading(false);
-                    }}
-                    className={`absolute inset-x-1/2 top-1/2 flex h-12 w-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-2 rounded-full bg-white/95 text-primary-deep shadow-lg transition-opacity ${
-                      isStopOverlayFading ? "opacity-0" : "opacity-100"
-                    }`}
-                  >
-                    <Square className="h-4 w-4 fill-current" />
-                    <span className="text-sm font-semibold">停止监控</span>
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="relative mt-2 flex items-center justify-center text-xs text-white/80">
-                {isMonitoringOn ? "已开启监控" : "未开启监控"}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setIsLightOn((v) => !v)}
-                className={`rounded-xl px-3 py-2.5 text-sm font-semibold shadow-sm transition ${
-                  isLightOn ? "bg-primary text-on-primary" : "bg-surface-yellow text-primary-deep"
-                }`}
-              >
-                <Lightbulb className="mr-1.5 inline h-4 w-4" />
-                {isLightOn ? "指示灯已开启" : "开启指示灯"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsSoundOn((v) => !v)}
-                className={`rounded-xl px-3 py-2.5 text-sm font-semibold shadow-sm transition ${
-                  isSoundOn ? "bg-secondary text-white" : "bg-surface-blue text-secondary"
-                }`}
-              >
-                <Volume2 className="mr-1.5 inline h-4 w-4" />
-                {isSoundOn ? "声音已开启" : "发出声音"}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (callStatus === "inCall") {
-                  hangUpCall();
-                  return;
-                }
-                openDialer();
-              }}
-              className={`mt-2 flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold shadow-sm transition ${
-                callStatus === "inCall"
-                  ? "bg-primary text-on-primary"
-                  : callStatus === "dialing"
-                    ? "bg-surface-blue text-secondary"
-                    : callStatus === "ended"
-                      ? "bg-surface-yellow text-primary-deep"
-                      : "bg-surface-muted text-secondary"
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Phone className="h-4 w-4" />
-                {callStatus === "inCall" ? "正在通话（点此挂断）" : callLabelMap[callStatus]}
-              </span>
-            </button>
-          </SoftCard>
-
-          {dialOpen ? (
-            <div
-              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
-              role="dialog"
-              aria-modal="true"
-              onClick={() => setDialOpen(false)}
-            >
-              <div
-                className="w-full max-w-[390px] rounded-t-[2rem] bg-surface-elevated px-5 pb-[env(safe-area-inset-bottom)] pt-5 shadow-[var(--shadow-soft)]"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-primary-deep">拨打电话</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDialOpen(false);
-                      if (callStatus === "dialing") setCallStatus("idle");
-                    }}
-                    className="text-sm font-semibold text-teal-muted"
-                  >
-                    取消
-                  </button>
-                </div>
-
-                <div className="rounded-2xl bg-surface-muted px-4 py-3 text-center">
-                  <p className="text-[11px] font-semibold text-secondary">电话号码</p>
-                  <p className="mt-1 min-h-7 text-2xl font-bold tracking-[0.08em] text-primary-deep">
-                    {phoneNumber || "-"}
+          <SoftCard className="overflow-hidden bg-surface-elevated p-0 shadow-[0_20px_40px_rgb(38_26_0/0.08)]">
+            <div className="bg-gradient-to-br from-[#fff0d2] via-[#fff8ea] to-[#e6f0ec] p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-muted">
+                    项圈通话
+                  </p>
+                  <h3 className="mt-1 text-xl font-bold text-primary-deep">
+                    {currentPet ? `呼叫 ${currentPet.name} 的项圈` : "呼叫项圈"}
+                  </h3>
+                  <p className="mt-1 text-xs leading-relaxed text-teal-muted">
+                    无需输入号码，点击后直接呼叫当前绑定设备。
                   </p>
                 </div>
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${currentDevice?.online ? "bg-emerald-500" : "bg-stone-400"}`} />
+              </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  {dialKeys.map((key) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => appendDialKey(key)}
-                      className="rounded-2xl bg-surface-muted px-3 py-3.5 text-lg font-semibold text-primary-deep shadow-sm"
-                    >
-                      {key}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={removeLastDigit}
-                    className="flex items-center justify-center rounded-xl bg-surface-muted px-3 py-3 text-sm font-semibold text-secondary"
-                    aria-label="删除一位"
-                  >
-                    <Delete className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDialOpen(false)}
-                    className="rounded-xl bg-surface-muted px-3 py-3 text-sm font-semibold text-secondary"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (phoneNumber.trim()) setCallStatus("inCall");
-                      setDialOpen(false);
-                    }}
-                    className="rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-on-primary"
-                  >
-                    拨号
-                  </button>
-                </div>
+              <div className="mt-5 flex flex-col items-center rounded-[1.5rem] bg-white/72 px-4 py-5 shadow-sm backdrop-blur">
+                <button
+                  type="button"
+                  disabled={!currentDevice || !currentDevice.online || callStatus === "dialing"}
+                  onClick={() => {
+                    if (callStatus === "inCall") {
+                      hangUpCall();
+                      return;
+                    }
+                    setCallStatus("dialing");
+                  }}
+                  className={`flex h-20 w-20 items-center justify-center rounded-full text-white shadow-lg transition active:scale-95 disabled:cursor-not-allowed disabled:bg-stone-300 ${
+                    callStatus === "inCall" ? "bg-rose-500" : "bg-primary"
+                  }`}
+                  aria-label={callStatus === "inCall" ? "挂断电话" : "直接呼叫项圈"}
+                >
+                  {callStatus === "inCall" ? (
+                    <PhoneOff className="h-8 w-8" />
+                  ) : callStatus === "dialing" ? (
+                    <PhoneCall className="h-8 w-8 animate-pulse" />
+                  ) : (
+                    <Phone className="h-8 w-8" />
+                  )}
+                </button>
+                <p className="mt-3 text-sm font-bold text-primary-deep">
+                  {callStatus === "inCall" ? "正在通话 · 点按挂断" : callLabelMap[callStatus]}
+                </p>
+                <p className="mt-1 text-[11px] text-teal-muted">
+                  {!currentDevice
+                    ? "当前宠物未绑定设备"
+                    : !currentDevice.online
+                      ? "设备离线，暂时无法呼叫"
+                      : `设备 ${currentDevice.id} · 在线`}
+                </p>
               </div>
             </div>
-          ) : null}
+
+            {currentDevice ? (
+              <Link
+                href={`/profile/device/whitelist?id=${encodeURIComponent(currentDevice.id)}`}
+                className="flex items-center justify-between gap-3 px-5 py-3.5 transition active:bg-surface-muted"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-primary-deep">
+                  <ShieldCheck className="h-4.5 w-4.5 text-secondary" />
+                  通话白名单
+                </span>
+                <span className="text-xs font-semibold text-teal-muted">
+                  {(currentDevice.callWhitelist ?? []).length}/10 个号码 ›
+                </span>
+              </Link>
+            ) : null}
+          </SoftCard>
         </section>
 
         <section>

@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Battery, ChevronDown, Download, Plus, Signal, Wifi } from "lucide-react";
+import { Battery, ChevronDown, Download, Plus, ShieldCheck, Signal, Wifi } from "lucide-react";
 import { MobileShell } from "@/components/layout/MobileShell";
 import { AppTopBar } from "@/components/layout/AppTopBar";
 import { SoftCard } from "@/components/ui/SoftCard";
@@ -71,6 +71,22 @@ function DeviceMain({ deviceId }: { deviceId: string }) {
           <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 text-teal-muted" strokeWidth={2} aria-hidden />
         </div>
       </div>
+
+      <Link
+        href={`/profile/device/whitelist?id=${encodeURIComponent(device.id)}`}
+        className="flex items-center gap-3 rounded-2xl bg-surface-blue/80 p-4 shadow-sm ring-1 ring-black/[0.05] transition active:scale-[0.99]"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/85 text-secondary">
+          <ShieldCheck className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold text-primary-deep">通话白名单</span>
+          <span className="mt-0.5 block text-xs text-teal-muted">只允许已添加的号码呼入项圈</span>
+        </span>
+        <span className="shrink-0 text-xs font-semibold text-secondary">
+          {(device.callWhitelist ?? []).length}/10 ›
+        </span>
+      </Link>
 
       <div className="grid grid-cols-2 gap-2">
         <SoftCard className="bg-surface-muted/90 p-3">

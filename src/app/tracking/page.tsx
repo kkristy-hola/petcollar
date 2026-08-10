@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from "react";
 import {
-  History,
+  BellRing,
   Layers,
+  Lightbulb,
   LocateFixed,
+  MapPin,
   Minus,
+  Navigation,
   Plus,
   Route,
   Search,
@@ -16,6 +19,19 @@ import { AppTopBar } from "@/components/layout/AppTopBar";
 import { PetSwitch } from "@/components/pets/PetSwitch";
 import { usePets } from "@/state/pets-context";
 import { getEffectivePetDeviceStatus, useAppStore } from "@/state/app-store";
+
+type TrajectoryPeriod = "day" | "week" | "month";
+
+function trajectoryPoints(period: TrajectoryPeriod, petId: string, pathIndex: number) {
+  const seed = petId.split("").reduce((sum, character) => sum + character.charCodeAt(0), 0);
+  const spread = period === "day" ? 45 : period === "week" ? 58 : 66;
+  return Array.from({ length: 10 }, (_, index) => {
+    const progress = index / 9;
+    const x = 16 + spread * progress + Math.sin(progress * Math.PI * 2 + seed * 0.03) * 7;
+    const y = 28 + pathIndex * 8 + spread * 0.45 * progress + Math.cos(progress * Math.PI * 1.8 + seed * 0.02) * 9;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
 
 export default function TrackingPage() {
   const { pets, selectedPetId } = usePets();
@@ -32,6 +48,11 @@ export default function TrackingPage() {
   const [zoomLevel, setZoomLevel] = useState(2);
   const [focusPulse, setFocusPulse] = useState(false);
   const [centerShift, setCenterShift] = useState({ x: 0, y: 0 });
+  const [findOpen, setFindOpen] = useState(false);
+  const [trajectoryOpen, setTrajectoryOpen] = useState(false);
+  const [trajectoryPeriod, setTrajectoryPeriod] = useState<TrajectoryPeriod>("day");
+  const [collarLightOn, setCollarLightOn] = useState(false);
+  const [collarRingOn, setCollarRingOn] = useState(false);
 
   const markerData = useMemo(
     () =>
@@ -47,6 +68,24 @@ export default function TrackingPage() {
   );
 
   const zoomScale = 1 + (zoomLevel - 2) * 0.08;
+  const trajectoryLines = useMemo(
+    () =>
+      visiblePets.slice(0, 2).map((pet, index) => ({
+        id: pet.id,
+        name: pet.name,
+        points: trajectoryPoints(trajectoryPeriod, pet.id, index),
+        color: index === 0 ? "#7f5700" : "#40646a",
+        dash: index === 0 ? undefined : "4 4",
+      })),
+    [trajectoryPeriod, visiblePets],
+  );
+  const trajectorySummary = useMemo(() => {
+    const petSeed = selectedPet?.id.split("").reduce((sum, character) => sum + character.charCodeAt(0), 0) ?? 0;
+    const multiplier = trajectoryPeriod === "day" ? 1 : trajectoryPeriod === "week" ? 5.4 : 18.5;
+    const totalKm = ((3.2 + (petSeed % 8) * 0.2) * multiplier).toFixed(1);
+    const rangeKm = ((1.4 + (petSeed % 5) * 0.15) * (trajectoryPeriod === "day" ? 1 : trajectoryPeriod === "week" ? 1.7 : 2.4)).toFixed(1);
+    return { totalKm, rangeKm };
+  }, [selectedPet?.id, trajectoryPeriod]);
 
   function handleLocatePet() {
     if (!selectedPet) return;
@@ -75,8 +114,8 @@ export default function TrackingPage() {
       <div className="px-5 pt-1">
         <PetSwitch includeAll className="mb-3" />
       </div>
-      <div className="relative flex min-h-0 flex-1 px-5 pb-3">
-        <div className="relative min-h-0 flex-1 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#fde7d6] via-[#fff5ea] to-[#e3f0e7] shadow-[var(--shadow-soft)]">
+      <main className="space-y-3 px-5 pb-4">
+        <div className="relative h-[29rem] overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-[#fde7d6] via-[#fff5ea] to-[#e3f0e7] shadow-[var(--shadow-soft)]">
           <div
             className="absolute inset-0 opacity-50"
             style={{
@@ -107,35 +146,45 @@ export default function TrackingPage() {
 
           <div className="absolute bottom-3 right-3 top-3 z-10 flex flex-col justify-between">
             <div className="flex flex-col gap-1.5">
-              <Link
-                href="/tracking/find"
+              <button
+                type="button"
+                onClick={() => {
+                  const nextOpen = !findOpen;
+                  setFindOpen(nextOpen);
+                  if (nextOpen) setTrajectoryOpen(false);
+                }}
                 title="找宠模式"
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary shadow-sm transition active:scale-95"
+                className={`flex h-10 w-10 items-center justify-center rounded-full shadow-sm transition active:scale-95 ${
+                  findOpen ? "bg-secondary text-white" : "bg-primary text-on-primary"
+                }`}
                 aria-label="找宠模式"
               >
                 <Search className="h-4.5 w-4.5" />
-              </Link>
-              <Link
-                href="/tracking/trajectory"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextOpen = !trajectoryOpen;
+                  setTrajectoryOpen(nextOpen);
+                  if (nextOpen) {
+                    setFindOpen(false);
+                    setCollarLightOn(false);
+                    setCollarRingOn(false);
+                  }
+                }}
                 title="轨迹查询"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm backdrop-blur transition active:scale-95"
+                className={`flex h-9 w-9 items-center justify-center rounded-full shadow-sm backdrop-blur transition active:scale-95 ${
+                  trajectoryOpen ? "bg-secondary text-white" : "bg-white/90 text-primary"
+                }`}
                 aria-label="轨迹查询"
               >
                 <Route className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/tracking/track"
-                title="历史轨迹"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm backdrop-blur transition active:scale-95"
-                aria-label="历史轨迹"
-              >
-                <History className="h-4 w-4" />
-              </Link>
+              </button>
               <Link
                 href="/tracking/geofence"
-                title="图层/视图切换"
+                title="电子围栏"
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm backdrop-blur transition active:scale-95"
-                aria-label="图层视图切换"
+                aria-label="电子围栏"
               >
                 <Layers className="h-4 w-4" />
               </Link>
@@ -176,6 +225,28 @@ export default function TrackingPage() {
 
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative h-full w-full">
+              {trajectoryOpen ? (
+                <svg
+                  className="pointer-events-none absolute inset-0 h-full w-full"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  aria-hidden
+                >
+                  {trajectoryLines.map((line) => (
+                    <polyline
+                      key={line.id}
+                      points={line.points}
+                      fill="none"
+                      stroke={line.color}
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeDasharray={line.dash}
+                      opacity="0.88"
+                    />
+                  ))}
+                </svg>
+              ) : null}
               {markerData.map(({ pet, left, top, status }) => (
                 <div
                   key={pet.id}
@@ -205,7 +276,139 @@ export default function TrackingPage() {
             </div>
           </div>
         </div>
-      </div>
+
+        {trajectoryOpen ? (
+          <section className="rounded-[1.75rem] bg-surface-elevated p-4 shadow-[var(--shadow-soft)] ring-1 ring-black/[0.04]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-primary-deep">{selectedPet.name}的活动轨迹</h2>
+                <p className="mt-0.5 text-xs text-teal-muted">轨迹已显示在上方地图中</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrajectoryOpen(false)}
+                className="shrink-0 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-semibold text-teal-muted"
+              >
+                收起
+              </button>
+            </div>
+
+            <div className="mt-3 flex rounded-full bg-surface-muted p-1">
+              {([
+                { id: "day", label: "日" },
+                { id: "week", label: "周" },
+                { id: "month", label: "月" },
+              ] as const).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTrajectoryPeriod(item.id)}
+                  className={`flex-1 rounded-full py-2 text-xs font-bold transition ${
+                    trajectoryPeriod === item.id ? "bg-primary text-white shadow-sm" : "text-teal-muted"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-2xl bg-[#fff4dc] px-2 py-3">
+                <p className="text-[10px] text-teal-muted">活动范围</p>
+                <p className="mt-1 text-sm font-extrabold text-primary-deep">{trajectorySummary.rangeKm} km</p>
+              </div>
+              <div className="rounded-2xl bg-surface-blue/75 px-2 py-3">
+                <p className="text-[10px] text-teal-muted">总里程</p>
+                <p className="mt-1 text-sm font-extrabold text-primary-deep">{trajectorySummary.totalKm} km</p>
+              </div>
+              <div className="rounded-2xl bg-surface-muted px-2 py-3">
+                <p className="text-[10px] text-teal-muted">常去地点</p>
+                <p className="mt-1 flex items-center justify-center gap-1 text-[11px] font-bold leading-tight text-primary-deep">
+                  <MapPin className="h-3 w-3 shrink-0 text-primary" />
+                  社区公园
+                </p>
+              </div>
+            </div>
+
+            {trajectoryLines.length > 1 ? (
+              <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold text-teal-muted">
+                {trajectoryLines.map((line) => (
+                  <span key={line.id} className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-5 rounded-full" style={{ backgroundColor: line.color }} />
+                    {line.name}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {findOpen ? (
+          <section className="rounded-[1.75rem] bg-surface-elevated p-4 shadow-[var(--shadow-soft)] ring-1 ring-black/[0.04]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface-blue text-secondary">
+                  <Navigation className="h-5 w-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-primary-deep">正在接近 {selectedPet.name}</h2>
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                  </div>
+                  <p className="mt-0.5 text-xs text-teal-muted">约 12 米 · 大约 15 步 · 2 秒前更新</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setFindOpen(false);
+                  setCollarLightOn(false);
+                  setCollarRingOn(false);
+                }}
+                className="shrink-0 rounded-full bg-surface-muted px-3 py-1.5 text-xs font-semibold text-teal-muted"
+              >
+                结束
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCollarLightOn((value) => !value)}
+                disabled={!selectedStatus.online}
+                className={`rounded-2xl p-3 text-left transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  collarLightOn ? "bg-primary text-white" : "bg-surface-yellow text-primary-deep"
+                }`}
+              >
+                <Lightbulb className="h-5 w-5" />
+                <p className="mt-2 text-sm font-bold">{collarLightOn ? "项圈灯已开启" : "开启项圈灯"}</p>
+                <p className={`mt-0.5 text-[10px] ${collarLightOn ? "text-white/75" : "text-teal-muted"}`}>
+                  便于夜间发现
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollarRingOn((value) => !value)}
+                disabled={!selectedStatus.online}
+                className={`rounded-2xl p-3 text-left transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  collarRingOn ? "bg-secondary text-white" : "bg-surface-blue text-secondary"
+                }`}
+              >
+                <BellRing className="h-5 w-5" />
+                <p className="mt-2 text-sm font-bold">{collarRingOn ? "项圈正在鸣响" : "鸣响寻回"}</p>
+                <p className={`mt-0.5 text-[10px] ${collarRingOn ? "text-white/75" : "text-teal-muted"}`}>
+                  通过声音辅助定位
+                </p>
+              </button>
+            </div>
+            {!selectedStatus.online ? (
+              <p className="mt-3 rounded-xl bg-stone-100 px-3 py-2 text-xs text-stone-600">
+                当前项圈离线，灯光和鸣响暂不可用。
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+      </main>
     </MobileShell>
   );
 }

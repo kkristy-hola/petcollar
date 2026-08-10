@@ -39,6 +39,7 @@ export type AppDevice = {
   batteryPct: number;
   network: string;
   boundPetId: string | null;
+  callWhitelist: string[];
 };
 
 type AppState = {
@@ -160,6 +161,7 @@ const demoDevices: AppDevice[] = [
     batteryPct: 90,
     network: "LTE-M 网络",
     boundPetId: "pet-1",
+    callWhitelist: ["138 0013 8000", "139 0000 1122"],
   },
   {
     id: "PX-4410",
@@ -170,6 +172,7 @@ const demoDevices: AppDevice[] = [
     batteryPct: 84,
     network: "LTE-M 网络",
     boundPetId: "pet-2",
+    callWhitelist: ["138 0013 8000"],
   },
   {
     id: "TAG-102",
@@ -180,6 +183,7 @@ const demoDevices: AppDevice[] = [
     batteryPct: 61,
     network: "NB-IoT",
     boundPetId: "pet-3",
+    callWhitelist: [],
   },
 ];
 
@@ -308,6 +312,7 @@ export const useAppStore = create<AppStore>()(
             batteryPct: input?.batteryPct ?? randomIn(40, 98),
             network: input?.network || "LTE-M 网络",
             boundPetId: null,
+            callWhitelist: input?.callWhitelist ?? [],
           };
           return { devices: [device, ...state.devices] };
         }),
